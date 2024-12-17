@@ -1,0 +1,21 @@
+
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Environment variables
+.env
+
+# FAISS index files
+faiss_index/
+
+# Streamlit
+.streamlit/
+
+# PDFs
+leyes_pdf/*.pdf
+
+# System files
+.DS_Store
+Thumbs.db
