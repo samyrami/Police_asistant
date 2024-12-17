@@ -11,3 +11,5 @@ enableXsrfProtection=true
 [browser]
 gatherUsageStats=false
 
+[phases]
+start = "python app.py"
