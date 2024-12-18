@@ -3,5 +3,17 @@ pandas
 python-dotenv
 openai
 langchain
+langchain-openai
+langchain-community
 faiss-cpu
 pypdf
+tiktoken
+numpy
+scikit-learn
+typing-extensions
+tenacity
+typing-inspect
+pydantic
+aiohttp
+fastapi
+uvicorn
