@@ -7,8 +7,6 @@ restartPolicyType = "ON_FAILURE"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyMaxRetries = 5
-GOOGLE_APPLICATION_CREDENTIALS=credentials.json
-OAUTHLIB_INSECURE_TRANSPORT=1  # Solo si es necesario para desarrollo
 
 [deploy.envs]
 PORT = "8501"
