@@ -2,7 +2,12 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "streamlit run app.py --server.port $PORT --server.address 0.0.0.0"
+startCommand = "streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.maxUploadSize 5"
 restartPolicyType = "ON_FAILURE"
 healthcheckPath = "/_stcore/health"
 healthcheckTimeout = 300
+
+[deploy.envs]
+STREAMLIT_SERVER_MAX_UPLOAD_SIZE = "5"
+STREAMLIT_SERVER_ADDRESS = "0.0.0.0"
+PYTHONUNBUFFERED = "1"
