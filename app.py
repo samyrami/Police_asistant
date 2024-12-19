@@ -36,6 +36,7 @@ with open('credentials.json', 'r') as file:
 # Codifica el contenido en base64
 encoded_credentials = base64.b64encode(credentials_content.encode()).decode()
 print(encoded_credentials)
+
 class GoogleDriveHandler:
     def __init__(self, folder_id="1bkETUy1xFxaJDe7Ox-dAPi8L4z4_SWAq"):
         self.folder_id = folder_id
