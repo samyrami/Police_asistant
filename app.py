@@ -13,7 +13,12 @@ from langchain_community.vectorstores import FAISS
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 import re
-
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
+import tempfile
 # Load environment variables
 load_dotenv()
 
@@ -22,7 +27,57 @@ API_KEY = os.getenv("OPENAI_API_KEY")
 if API_KEY is None:
     st.error("Error: OPENAI_API_KEY not found in environment variables")
     st.stop()
-    
+
+class GoogleDriveHandler:
+    def __init__(self, folder_id="1bkETUy1xFxaJDe7Ox-dAPi8L4z4_SWAq"):
+        self.folder_id = folder_id
+        self.credentials = None
+        self.service = None
+        
+    def authenticate(self):
+        """Autenticar con Google Drive"""
+        SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+        
+        try:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            self.credentials = flow.run_local_server(port=0)
+            self.service = build('drive', 'v3', credentials=self.credentials)
+            return True
+        except Exception as e:
+            st.error(f"Error en la autenticación de Google Drive: {str(e)}")
+            return False
+            
+    def download_files(self, local_dir):
+        """Descargar archivos PDF desde Google Drive"""
+        if not self.service:
+            if not self.authenticate():
+                return False
+                
+        try:
+            results = self.service.files().list(
+                q=f"'{self.folder_id}' in parents and mimeType='application/pdf'",
+                fields="files(id, name)"
+            ).execute()
+            
+            files = results.get('files', [])
+            for file in files:
+                request = self.service.files().get_media(fileId=file['id'])
+                fh = io.BytesIO()
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+                
+                # Guardar archivo localmente
+                local_path = os.path.join(local_dir, file['name'])
+                with open(local_path, 'wb') as f:
+                    f.write(fh.getvalue())
+                    
+            return True
+        except Exception as e:
+            st.error(f"Error descargando archivos: {str(e)}")
+            return False 
 class LawDocumentProcessor:
     def __init__(self, pdf_directory="./leyes_pdf"):
         self.pdf_directory = pdf_directory
@@ -34,14 +89,33 @@ class LawDocumentProcessor:
         )
         
     def load_documents(self):
-        """Carga todos los PDFs del directorio especificado"""
-        loader = DirectoryLoader(
-            self.pdf_directory,
-            glob="**/*.pdf",
-            loader_cls=PyPDFLoader
-        )
-        documents = loader.load()
-        return documents
+        """Cargar documentos con manejo de respaldo en Google Drive"""
+        try:
+            # Intentar cargar documentos locales primero
+            if os.path.exists(self.pdf_directory) and any(f.endswith('.pdf') for f in os.listdir(self.pdf_directory)):
+                loader = DirectoryLoader(
+                    self.pdf_directory,
+                    glob="**/*.pdf",
+                    loader_cls=PyPDFLoader
+                )
+                return loader.load()
+            
+            # Si no hay documentos locales, intentar con Google Drive
+            st.info("No se encontraron documentos locales. Intentando descargar desde Google Drive...")
+            drive_handler = GoogleDriveHandler()
+            if drive_handler.download_files(self.pdf_directory):
+                loader = DirectoryLoader(
+                    self.pdf_directory,
+                    glob="**/*.pdf",
+                    loader_cls=PyPDFLoader
+                )
+                return loader.load()
+            
+            raise Exception("No se pudieron cargar documentos locales ni de Google Drive")
+            
+        except Exception as e:
+            st.error(f"Error cargando documentos: {str(e)}")
+            return None
     
     def process_documents(self):
         """Procesa los documentos y crea el almacén de vectores"""
@@ -87,9 +161,7 @@ def setup_retrieval_chain(vector_store):
     
     return retrieval_chain
 
-# ... (código anterior del app.py) ...
 
-# Añadir después de la inicialización de variables globales
 try:
     vector_store = LawDocumentProcessor.load_vector_store()
     if vector_store is None:
@@ -117,7 +189,7 @@ def get_chat_response(prompt, temperature=0.3):
             ]
             
             chat_model = ChatOpenAI(
-                model="gpt-4",
+                model="gpt-4o",
                 temperature=temperature,
                 api_key=API_KEY,
                 streaming=True,
