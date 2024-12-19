@@ -1,4 +1,6 @@
 # Python
+token.json
+credentials.json
 __pycache__/
 *.py[cod]
 *$py.class

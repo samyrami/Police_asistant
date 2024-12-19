@@ -19,6 +19,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
 import tempfile
+import base64
 # Load environment variables
 load_dotenv()
 
@@ -28,6 +29,13 @@ if API_KEY is None:
     st.error("Error: OPENAI_API_KEY not found in environment variables")
     st.stop()
 
+# Lee el archivo credentials.json
+with open('credentials.json', 'r') as file:
+    credentials_content = file.read()
+
+# Codifica el contenido en base64
+encoded_credentials = base64.b64encode(credentials_content.encode()).decode()
+print(encoded_credentials)
 class GoogleDriveHandler:
     def __init__(self, folder_id="1bkETUy1xFxaJDe7Ox-dAPi8L4z4_SWAq"):
         self.folder_id = folder_id
@@ -39,11 +47,31 @@ class GoogleDriveHandler:
         SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
         
         try:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            self.credentials = flow.run_local_server(port=0)
-            self.service = build('drive', 'v3', credentials=self.credentials)
-            return True
+            # Obtener credenciales desde variable de ambiente
+            credentials_b64 = os.getenv('GOOGLE_CREDENTIALS_B64')
+            if not credentials_b64:
+                st.error("Error: GOOGLE_CREDENTIALS_B64 no encontrado en variables de ambiente")
+                return False
+                
+            # Decodificar credenciales
+            credentials_json = base64.b64decode(credentials_b64).decode()
+            
+            # Crear archivo temporal de credenciales
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                temp_file.write(credentials_json)
+                temp_credentials_path = temp_file.name
+            
+            try:
+                # Usar el archivo temporal para la autenticación
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    temp_credentials_path, SCOPES)
+                self.credentials = flow.run_local_server(port=0)
+                self.service = build('drive', 'v3', credentials=self.credentials)
+                return True
+            finally:
+                # Asegurarse de eliminar el archivo temporal
+                os.unlink(temp_credentials_path)
+                
         except Exception as e:
             st.error(f"Error en la autenticación de Google Drive: {str(e)}")
             return False
