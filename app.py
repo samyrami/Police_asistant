@@ -442,7 +442,41 @@ def get_chat_response(prompt, temperature=0.3):
         st.error(f"Error generando respuesta: {str(e)}")
         return "Lo siento, ocurrió un error al procesar su solicitud."
 
+def ensure_directory_exists():
+    """Ensure necessary directories exist."""
+    directories = ["./faiss_index", "./leyes_pdf"]
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+def check_startup_health():
+    """Verify all components are ready."""
+    try:
+        # Check API key
+        if not API_KEY:
+            raise ValueError("OPENAI_API_KEY not set")
+            
+        # Check directories
+        ensure_directory_exists()
+        
+        # Check vector store
+        vector_store = LawDocumentProcessor.load_vector_store()
+        if vector_store is None:
+            st.warning("Initializing knowledge base...")
+            processor = LawDocumentProcessor()
+            vector_store = processor.process_documents()
+            
+        return True
+    except Exception as e:
+        st.error(f"Startup health check failed: {str(e)}")
+        return False
+
+# Add this at the start of your main function
+if not check_startup_health():
+    st.stop()
+
 def main():
+    ensure_directory_exists()
     st.set_page_config(page_title="PoliciApp", layout="centered")
     st.write(logo, unsafe_allow_html=True)
     st.title("PoliciApp - Asistente de Tránsito", anchor=False)
