@@ -16,8 +16,7 @@ faiss_index/
 # Streamlit
 .streamlit/
 
-# PDFs
-leyes_pdf/*.pdf
+
 
 # System files
 .DS_Store
