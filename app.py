@@ -35,12 +35,17 @@ class LawDocumentProcessor:
         
     def load_documents(self):
         """Carga todos los PDFs del directorio especificado"""
-        loader = DirectoryLoader(
-            self.pdf_directory,
-            glob="**/*.pdf",
-            loader_cls=PyPDFLoader
-        )
-        documents = loader.load()
+        try:
+            loader = DirectoryLoader(
+                'data',
+                glob="**/*.pdf",
+                loader_cls=PyPDFLoader,
+                show_progress=True
+            )
+            documents = loader.load()
+        except Exception as e:
+            st.error(f"Error loading PDFs: {str(e)}")
+            documents = []
         return documents
     
     def process_documents(self):
@@ -103,80 +108,72 @@ except Exception as e:
     vector_store = None
     retrieval_chain = None
 
-def get_chat_response(prompt, temperature=0.3):
-    """Generate chat response using the selected LLM and law knowledge base."""
-    try:
-        response_placeholder = st.empty()
-        stream_handler = StreamHandler(response_placeholder)
-        
-        # Si es una consulta de multa, usar el formato específico
-        if prompt.upper().startswith("MULTA:"):
-            messages = [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=prompt)
-            ]
-            
-            chat_model = ChatOpenAI(
-                model="gpt-4",
-                temperature=temperature,
-                api_key=API_KEY,
-                streaming=True,
-                callbacks=[stream_handler]
-            )
-            
-            response = chat_model.invoke(messages)
-        else:
-            # Para consultas generales, usar la base de conocimientos
-            result = retrieval_chain({"question": prompt})
-            response = result["answer"]
-            
-            # Agregar las fuentes de la información
-            if "source_documents" in result:
-                response += "\n\nFuentes consultadas:\n"
-                for doc in result["source_documents"]:
-                    response += f"- {doc.metadata.get('source', 'Documento legal')}\n"
-        
-        return stream_handler.text if prompt.upper().startswith("MULTA:") else response
-        
-    except Exception as e:
-        st.error(f"Error generando respuesta: {str(e)}")
-        return "Lo siento, ocurrió un error al procesar su solicitud."
+
 
 SYSTEM_PROMPT = """
 Eres PoliciApp, un asistente especializado para oficiales de policía de tránsito en Colombia. 
-Tu objetivo es proporcionar información legal detallada sobre infracciones de tránsito.
+Tu objetivo es proporcionar información legal precisa y contextualizada sobre infracciones de tránsito y comportamientos contrarios a la convivencia.
 
-DIRECTRICES PARA INFORMES DE INFRACCIONES:
+DIRECTRICES PARA INFORMES:
 
-I. Clasificación de Sanciones:
-- Monetarias (SMDLV o SMLMV)
-- No Monetarias (Suspensión, Retención)
-- Combinadas (Multa + Otra Acción)
+I. Clasificación de Infracciones:
+A. Infracciones de Tránsito:
+   - Monetarias (SMDLV o SMLMV)
+   - No Monetarias (Suspensión, Retención)
+   - Combinadas (Multa + Otra Acción)
+
+B. Comportamientos Contrarios a la Convivencia:
+   - Código Nacional de Seguridad y Convivencia Ciudadana
+   - Medidas correctivas aplicables
+   - Procedimientos específicos
 
 II. Debido Proceso:
-1. Identificación de la Infracción
-2. Procedimiento de Imposición
-3. Derechos del Infractor
-4. Mecanismos de Defensa
+1. Identificación precisa de la infracción o comportamiento
+2. Procedimiento de Imposición específico al caso
+3. Derechos del ciudadano
+4. Mecanismos de defensa aplicables
 
 III. Formato de Respuesta Detallado:
 
 | Campo | Descripción Detallada |
 |-------|----------------------|
-| Infracción | Descripción precisa |
-| Base Legal | Artículo específico |
-| Tipo de Sanción | Monetaria/No Monetaria/Combinada |
-| Cuantía | Valor en SMDLV/SMLMV o descripción |
-| Procedimiento | Pasos legales a seguir |
-| Consecuencias Adicionales | Suspensión, retención, etc. |
-| Derechos del Infractor | Recursos legales |
+| Tipo de Infracción | Tránsito o Comportamiento Contrario |
+| Descripción | Descripción precisa del comportamiento |
+| Base Legal | Artículo específico (TEXTO COMPLETO) |
+| Tipo de Sanción | Monetaria/No Monetaria/Medida Correctiva |
+| Cuantía | Valor específico en SMDLV/SMLMV |
+| Procedimiento | Pasos específicos según el tipo de infracción |
+| Medidas Inmediatas | Acciones que debe tomar el agente |
+| Derechos Ciudadano | Recursos y garantías específicas |
 
 INSTRUCCIONES ESPECIALES:
-- Citar normas exactas
-- Describir procedimiento detallado
-- Explicar consecuencias legales
-- Indicar mecanismos de defensa
+1. SIEMPRE citar el artículo completo y textual de la norma
+2. Diferenciar claramente entre infracciones de tránsito y comportamientos contrarios
+3. Proporcionar el procedimiento específico según el tipo de infracción
+4. Incluir las medidas inmediatas que debe tomar el agente
+5. NO ASUMIR que todas las infracciones son de tránsito
+6. Verificar el contexto antes de citar normas de tránsito
 """
+
+
+def get_article_text(vector_store, article_reference):
+    """
+    Busca y retorna el texto completo de un artículo específico.
+    """
+    # Realizar una búsqueda específica por el número de artículo
+    similar_docs = vector_store.similarity_search(
+        f"Artículo {article_reference}",
+        k=3
+    )
+    
+    # Filtrar y extraer el texto completo del artículo
+    for doc in similar_docs:
+        content = doc.page_content
+        if f"Artículo {article_reference}" in content:
+            # Extraer el texto completo del artículo
+            return content
+    
+    return None
 
 def calcular_sancion(detalles_sancion):
     """
@@ -243,7 +240,58 @@ def calcular_sancion(detalles_sancion):
 
     return resultado
     
-    
+
+def display_response(response_text, container):
+    """Display the response using Streamlit components with article text."""
+    if '|' in response_text:
+        df, other_text = extract_table_data(response_text)
+        if df is not None:
+            if other_text:
+                container.markdown(other_text)
+            
+            container.markdown("### Detalles de la Infracción")
+            
+            # Buscar referencias a artículos en la tabla
+            for index, row in df.iterrows():
+                if row['Campo'] == 'Base Legal' and row['Valor']:
+                    # Extraer número de artículo (ajustar según el formato)
+                    article_match = re.search(r'Artículo (\d+)', row['Valor'])
+                    if article_match:
+                        article_num = article_match.group(1)
+                        article_text = get_article_text(vector_store, article_num)
+                        if article_text:
+                            # Añadir el texto completo del artículo a la tabla
+                            df.loc[len(df)] = ['Texto Completo del Artículo', article_text]
+            
+            styled_df = df.style.set_properties(**{
+                'background-color': '#f0f2f6',
+                'color': '#1f1f1f',
+                'border': '2px solid #1e3d59',
+                'white-space': 'pre-wrap'  # Para preservar saltos de línea
+            })
+            
+            container.dataframe(
+                styled_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Campo": st.column_config.TextColumn(
+                        "Campo",
+                        help="Categoría de la información",
+                        width="medium",
+                    ),
+                    "Valor": st.column_config.TextColumn(
+                        "Valor",
+                        help="Información detallada",
+                        width="large",
+                    )
+                }
+            )
+        else:
+            container.markdown(response_text)
+    else:
+        container.markdown(response_text)   
+ 
 class StreamHandler(BaseCallbackHandler):
     def __init__(self, container):
         self.container = container
@@ -251,6 +299,7 @@ class StreamHandler(BaseCallbackHandler):
         
     def on_llm_new_token(self, token: str, **kwargs) -> None:
         self.text += token
+
         display_response(self.text, self.container)
 
 def extract_table_data(markdown_text):
@@ -283,43 +332,7 @@ def extract_table_data(markdown_text):
         st.error(f"Error procesando la tabla: {str(e)}")
         return None, None
 
-def display_response(response_text, container):
-    """Display the response using Streamlit components."""
-    if '|' in response_text:
-        df, other_text = extract_table_data(response_text)
-        if df is not None:
-            if other_text:
-                container.markdown(other_text)
-            
-            container.markdown("### Detalles de la Infracción")
-            
-            styled_df = df.style.set_properties(**{
-                'background-color': '#f0f2f6',
-                'color': '#1f1f1f',
-                'border': '2px solid #1e3d59'
-            })
-            
-            container.dataframe(
-                styled_df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Campo": st.column_config.TextColumn(
-                        "Campo",
-                        help="Categoría de la información",
-                        width="medium",
-                    ),
-                    "Valor": st.column_config.TextColumn(
-                        "Valor",
-                        help="Información detallada",
-                        width="large",
-                    )
-                }
-            )
-        else:
-            container.markdown(response_text)
-    else:
-        container.markdown(response_text)
+
 
 def search_laws(query):
     """Buscar en los documentos legales vectorizados con más detalles."""
@@ -349,71 +362,23 @@ def search_laws(query):
 
 
 def get_chat_response(prompt, temperature=0.3):
-    """Generar respuesta usando la base de conocimientos legales."""
+    """Generate chat response using the selected LLM with improved context handling."""
     try:
         response_placeholder = st.empty()
         stream_handler = StreamHandler(response_placeholder)
         
-        # Configurar el modelo de chat
-        chat_model = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=temperature,
-            api_key=API_KEY,
-            streaming=True,
-            callbacks=[stream_handler]
-        )
+        # Primero, buscar contexto relevante en la base de datos
+        relevant_context = search_laws(prompt)
         
-        # Preparar mensajes
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=prompt)
-        ]
+        # Crear un prompt enriquecido con el contexto
+        enhanced_prompt = f"""
+        Consulta: {prompt}
         
-        # Procesar consulta de multa
-        if prompt.upper().startswith("MULTA:"):
-            multa_content = prompt[6:].strip()
-            
-            # Invocar modelo
-            response_raw = chat_model.invoke(messages).content
-            
-            # Ejemplo de estructura para análisis de sanciones
-            detalles_sancion = {
-                "monetaria": {"unidad": "SMDLV", "cantidad": 15},
-                "no_monetaria": ["Suspensión de Licencia", "Retención de Vehículo"]
-            }
-            
-            # Calcular sanción
-            calculo_sancion = calcular_sancion(detalles_sancion)
-            
-            # Formatear respuesta completa
-            respuesta_completa = f"""
-{response_raw}
-
-### Detalles de la Sanción:
-
-**Sanciones Aplicadas:**
-{chr(10).join([f"- {s.get('tipo')}: {s.get('descripcion', s.get('valor', 'N/A'))}" for s in calculo_sancion['sanciones']])}
-
-**Procedimiento Detallado:**
-{calculo_sancion['procedimiento_detallado']}
-
-**Derechos del Infractor:**
-{calculo_sancion['derechos_infractor']}
-            """
-            
-            return respuesta_completa
+        Contexto relevante encontrado en la base de datos:
+        {relevant_context.to_string() if not relevant_context.empty else 'No se encontró contexto específico'}
         
-        # Resto del código de recuperación de información permanece igual
-        
-    except Exception as e:
-        st.error(f"Error generando respuesta: {str(e)}")
-        return "Lo siento, ocurrió un error al procesar su solicitud."
-
-def get_chat_response(prompt, temperature=0.3):
-    """Generate chat response using the selected LLM."""
-    try:
-        response_placeholder = st.empty()
-        stream_handler = StreamHandler(response_placeholder)
+        Por favor, proporciona una respuesta detallada basada en este contexto y las normas aplicables.
+        """
         
         chat_model = ChatOpenAI(
             model="gpt-4o",
@@ -425,7 +390,7 @@ def get_chat_response(prompt, temperature=0.3):
         
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=prompt)
+            HumanMessage(content=enhanced_prompt)
         ]
         
         if "messages" in st.session_state:
@@ -441,6 +406,7 @@ def get_chat_response(prompt, temperature=0.3):
     except Exception as e:
         st.error(f"Error generando respuesta: {str(e)}")
         return "Lo siento, ocurrió un error al procesar su solicitud."
+
 
 def ensure_directory_exists():
     """Ensure necessary directories exist."""
