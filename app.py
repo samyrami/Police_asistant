@@ -445,8 +445,8 @@ def main():
     ensure_directory_exists()
     st.set_page_config(page_title="PoliciApp", layout="centered")
     st.write(logo, unsafe_allow_html=True)
-    st.title("PoliciApp - Asistente de Tránsito", anchor=False)
-    st.markdown("**Asistente virtual para consulta rápida de infracciones y procedimientos de tránsito**")
+    st.title("PoliciApp", anchor=False)
+    st.markdown("**Asistente virtual para procedimientos de multas y comparendos**")
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
