@@ -133,18 +133,23 @@ II. Debido Proceso:
 3. Derechos del ciudadano
 4. Mecanismos de defensa aplicables
 
-III. Formato de Respuesta Detallado:
+III. Formato de Respuesta:
 
-| Campo | Descripción Detallada |
-|-------|----------------------|
-| Tipo de Infracción | Tránsito o Comportamiento Contrario |
-| Descripción | Descripción precisa del comportamiento |
-| Base Legal | Artículo específico (TEXTO COMPLETO) |
-| Tipo de Sanción | Monetaria/No Monetaria/Medida Correctiva |
-| Cuantía | Valor específico en SMDLV/SMLMV |
-| Procedimiento | Pasos específicos según el tipo de infracción |
-| Medidas Inmediatas | Acciones que debe tomar el agente |
-| Derechos Ciudadano | Recursos y garantías específicas |
+• Tipo de Infracción: [Tránsito o Comportamiento Contrario]
+
+• Descripción: [Descripción precisa del comportamiento]
+
+• Base Legal: [Artículo específico (TEXTO COMPLETO)]
+
+• Tipo de Sanción: [Monetaria/No Monetaria/Medida Correctiva]
+
+• Cuantía: [Valor específico en SMDLV/SMLMV]
+
+• Procedimiento: [Pasos específicos según el tipo de infracción]
+
+• Medidas Inmediatas: [Acciones que debe tomar el agente]
+
+• Derechos del Ciudadano: [Recursos y garantías específicas]
 
 INSTRUCCIONES ESPECIALES:
 1. SIEMPRE citar el artículo completo y textual de la norma
