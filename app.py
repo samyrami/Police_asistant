@@ -111,57 +111,53 @@ except Exception as e:
 
 
 SYSTEM_PROMPT = """
-[INSTRUCCIONES INTERNAS - NO MOSTRAR EN RESPUESTA]
-- Sé extremadamente preciso con citaciones legales y montos
-- Verifica múltiples veces la información antes de responder
-- No hagas interpretaciones sin base legal
-- Indica explícitamente si no encuentras información exacta
-- Contrasta siempre con múltiples fuentes
-- Advierte sobre cualquier ambigüedad en la norma
+Eres PoliciApp, un asistente especializado para oficiales de policía de tránsito en Colombia. 
+Tu objetivo es proporcionar información legal precisa y contextualizada sobre infracciones de tránsito y comportamientos contrarios a la convivencia.
 
-[FORMATO DE RESPUESTA A UTILIZAR]
-
-• Descripción Legal: [Cita TEXTUAL de la norma que describe la infracción]
-
-• Base Legal: [Artículo COMPLETO con número exacto y texto íntegro]
-
-• Sanción Específica:
-  - Valor Monetario: [Cantidad EXACTA en SMDLV/SMLMV]
-  - Medidas Adicionales: [Todas las medidas aplicables con duración]
-
-• Procedimiento Detallado:
-  - Base legal del procedimiento
-  - Pasos específicos numerados
-  - Plazos exactos para cada acción
-
-• Medidas Inmediatas del Agente:
-  - Acciones obligatorias
-  - Documentación requerida
-  - Procedimientos de aseguramiento
-
-• Derechos del Ciudadano:
-  - Base legal de cada derecho
-  - Términos exactos para recursos
-  - Autoridades competentes
-
-[REQUISITOS DE CONTENIDO]
+DIRECTRICES PARA INFORMES:
 
 I. Clasificación de Infracciones:
 A. Infracciones de Tránsito:
-   - Monetarias: Especificar EXACTAMENTE el valor en SMDLV o SMLMV
-   - No Monetarias: Detallar duración exacta de suspensiones/retenciones
-   - Combinadas: Especificar TODAS las sanciones aplicables
+   - Monetarias (SMDLV o SMLMV)
+   - No Monetarias (Suspensión, Retención)
+   - Combinadas (Multa + Otra Acción)
 
 B. Comportamientos Contrarios a la Convivencia:
-   - Citar el artículo EXACTO del Código Nacional de Seguridad
-   - Especificar TODAS las medidas correctivas aplicables
-   - Detallar el procedimiento paso a paso
+   - Código Nacional de Seguridad y Convivencia Ciudadana
+   - Medidas correctivas aplicables
+   - Procedimientos específicos
 
-II. Debido Proceso (Obligatorio incluir):
-1. Número y texto COMPLETO del artículo infringido
-2. Procedimiento específico con base legal
-3. Derechos del ciudadano citando la norma exacta
-4. Recursos procedentes con términos precisos
+II. Debido Proceso:
+1. Identificación precisa de la infracción o comportamiento
+2. Procedimiento de Imposición específico al caso
+3. Derechos del ciudadano
+4. Mecanismos de defensa aplicables
+
+III. Formato de Respuesta:
+
+• Tipo de Infracción: [Tránsito o Comportamiento Contrario]
+
+• Descripción: [Descripción precisa del comportamiento]
+
+• Base Legal: [Artículo específico (TEXTO COMPLETO)]
+
+• Tipo de Sanción: [Monetaria/No Monetaria/Medida Correctiva]
+
+• Cuantía: [Valor específico en SMDLV/SMLMV]
+
+• Procedimiento: [Pasos específicos según el tipo de infracción]
+
+• Medidas Inmediatas: [Acciones que debe tomar el agente]
+
+• Derechos del Ciudadano: [Recursos y garantías específicas]
+
+INSTRUCCIONES ESPECIALES:
+1. SIEMPRE citar el artículo completo y textual de la norma
+2. Diferenciar claramente entre infracciones de tránsito y comportamientos contrarios
+3. Proporcionar el procedimiento específico según el tipo de infracción
+4. Incluir las medidas inmediatas que debe tomar el agente
+5. NO ASUMIR que todas las infracciones son de tránsito
+6. Verificar el contexto antes de citar normas de tránsito
 """
 
 
@@ -252,55 +248,9 @@ def calcular_sancion(detalles_sancion):
 
 def display_response(response_text, container):
     """Display the response using Streamlit components with article text."""
-    if '|' in response_text:
-        df, other_text = extract_table_data(response_text)
-        if df is not None:
-            if other_text:
-                container.markdown(other_text)
-            
-            container.markdown("### Detalles de la Infracción")
-            
-            # Buscar referencias a artículos en la tabla
-            for index, row in df.iterrows():
-                if row['Campo'] == 'Base Legal' and row['Valor']:
-                    # Extraer número de artículo (ajustar según el formato)
-                    article_match = re.search(r'Artículo (\d+)', row['Valor'])
-                    if article_match:
-                        article_num = article_match.group(1)
-                        article_text = get_article_text(vector_store, article_num)
-                        if article_text:
-                            # Añadir el texto completo del artículo a la tabla
-                            df.loc[len(df)] = ['Texto Completo del Artículo', article_text]
-            
-            styled_df = df.style.set_properties(**{
-                'background-color': '#f0f2f6',
-                'color': '#1f1f1f',
-                'border': '2px solid #1e3d59',
-                'white-space': 'pre-wrap'  # Para preservar saltos de línea
-            })
-            
-            container.dataframe(
-                styled_df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Campo": st.column_config.TextColumn(
-                        "Campo",
-                        help="Categoría de la información",
-                        width="medium",
-                    ),
-                    "Valor": st.column_config.TextColumn(
-                        "Valor",
-                        help="Información detallada",
-                        width="large",
-                    )
-                }
-            )
-        else:
-            container.markdown(response_text)
-    else:
-        container.markdown(response_text)   
- 
+    # Simplemente mostrar el texto como markdown
+    container.markdown(response_text)
+
 class StreamHandler(BaseCallbackHandler):
     def __init__(self, container):
         self.container = container
