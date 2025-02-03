@@ -121,8 +121,6 @@ SYSTEM_PROMPT = """
 
 [FORMATO DE RESPUESTA A UTILIZAR]
 
-• Tipo de Infracción: [ESPECIFICAR código exacto de la infracción]
-
 • Descripción Legal: [Cita TEXTUAL de la norma que describe la infracción]
 
 • Base Legal: [Artículo COMPLETO con número exacto y texto íntegro]
