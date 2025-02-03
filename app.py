@@ -163,20 +163,37 @@ INSTRUCCIONES ESPECIALES:
 
 def get_article_text(vector_store, article_reference):
     """
-    Busca y retorna el texto completo de un artículo específico.
+    Busca y retorna el texto completo de un artículo específico con mejor precisión.
     """
-    # Realizar una búsqueda específica por el número de artículo
-    similar_docs = vector_store.similarity_search(
+    # Realizar una búsqueda más específica incluyendo variaciones comunes
+    search_queries = [
         f"Artículo {article_reference}",
-        k=3
-    )
+        f"ARTÍCULO {article_reference}",
+        f"Art. {article_reference}",
+        f"Numeral {article_reference}"
+    ]
     
-    # Filtrar y extraer el texto completo del artículo
-    for doc in similar_docs:
+    all_results = []
+    for query in search_queries:
+        similar_docs = vector_store.similarity_search(
+            query,
+            k=5  # Aumentado para mejor cobertura
+        )
+        all_results.extend(similar_docs)
+    
+    # Mejorar la extracción del artículo específico
+    for doc in all_results:
         content = doc.page_content
-        if f"Artículo {article_reference}" in content:
-            # Extraer el texto completo del artículo
-            return content
+        # Buscar coincidencias exactas con diferentes formatos
+        patterns = [
+            rf"(?:Artículo|ARTÍCULO|Art\.|Numeral)\s*{article_reference}\b[.\s]+(.*?)(?=(?:Artículo|ARTÍCULO|Art\.|Numeral)\s*\d+|\Z)",
+            rf"{article_reference}\.\s+(.*?)(?=\d+\.\s+|\Z)"
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
     
     return None
 
@@ -326,15 +343,29 @@ def get_chat_response(prompt, temperature=0.3):
         response_placeholder = st.empty()
         stream_handler = StreamHandler(response_placeholder)
         
-        # Primero, buscar contexto relevante en la base de datos
+        # Mejorar la búsqueda de contexto
         relevant_context = search_laws(prompt)
         
-        # Crear un prompt enriquecido con el contexto
+        # Extraer posibles referencias a artículos del prompt
+        article_references = re.findall(r'(?:artículo|numeral)\s+(\d+(?:\.\d+)?)', prompt.lower())
+        
+        # Obtener el texto completo de los artículos mencionados
+        article_texts = []
+        if article_references:
+            for ref in article_references:
+                article_text = get_article_text(vector_store, ref)
+                if article_text:
+                    article_texts.append(f"Artículo {ref}: {article_text}")
+        
+        # Crear un prompt enriquecido con el contexto y los artículos específicos
         enhanced_prompt = f"""
         Consulta: {prompt}
         
-        Contexto relevante encontrado en la base de datos:
-        {relevant_context.to_string() if not relevant_context.empty else 'No se encontró contexto específico'}
+        Artículos específicos mencionados:
+        {'\n'.join(article_texts) if article_texts else 'No se mencionaron artículos específicos'}
+        
+        Contexto relevante adicional:
+        {relevant_context.to_string() if not relevant_context.empty else 'No se encontró contexto adicional'}
         
         Por favor, proporciona una respuesta detallada basada en este contexto y las normas aplicables.
         """
